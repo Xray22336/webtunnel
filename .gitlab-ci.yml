@@ -28,7 +28,7 @@ build_amd64_linux:
     - amd64
   artifacts:
     paths:
-      - build/amd64_linux/
+      - build/amd64-linux/
   script: ./release/build.sh
 
 build_arm64_linux:
@@ -39,4 +39,4 @@ build_arm64_linux:
     GOOS: linux
   artifacts:
     paths:
-      - build/arm64_linux/
+      - build/arm64-linux/
