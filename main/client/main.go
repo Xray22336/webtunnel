@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/url"
 	"os"
 	"os/signal"
 
@@ -97,16 +98,37 @@ func socksAcceptLoop(ln *pt.SocksListener, shutdown chan struct{}, wg *sync.Wait
 				defer close(handler)
 				var config ClientConfig
 
+				if urlStr, ok := conn.Req.Args.Get("url"); ok {
+					url, err := url.Parse(urlStr)
+					if err != nil {
+						log.Printf("url parse error: %s", err)
+						conn.Reject()
+						return
+					}
+					defaultPort := ""
+					switch url.Scheme {
+					case "https":
+						config.TLSKind = "tls"
+						defaultPort = "443"
+					case "http":
+						config.TLSKind = ""
+						defaultPort = "80"
+					default:
+						log.Printf("url parse error: unknown scheme")
+						conn.Reject()
+						return
+					}
+					config.Path = url.RawPath
+					config.TLSServerName = url.Hostname()
+					port := url.Port()
+					if port == "" {
+						port = defaultPort
+					}
+					config.RemoteAddress = url.Hostname() + ":" + port
+				}
+
 				if remoteAddress, ok := conn.Req.Args.Get("addr"); ok {
 					config.RemoteAddress = remoteAddress
-				}
-
-				if path, ok := conn.Req.Args.Get("path"); ok {
-					config.Path = path
-				}
-
-				if tlsKind, ok := conn.Req.Args.Get("tls"); ok {
-					config.TLSKind = tlsKind
 				}
 
 				if tlsServerName, ok := conn.Req.Args.Get("servername"); ok {
