@@ -36,7 +36,7 @@ func main() {
 				break
 			}
 			log.Printf("Started SOCKS listener at %v.", ln.Addr())
-			go socksAcceptLoop(ln, nil, shutdown, &wg)
+			go socksAcceptLoop(ln, shutdown, &wg)
 			pt.Cmethod(methodName, ln.Version(), ln.Addr())
 			listeners = append(listeners, ln)
 		default:
@@ -75,7 +75,7 @@ func main() {
 }
 
 // Accept local SOCKS connections and connect to a transport connection
-func socksAcceptLoop(ln *pt.SocksListener, _ *struct{}, shutdown chan struct{}, wg *sync.WaitGroup) {
+func socksAcceptLoop(ln *pt.SocksListener, shutdown chan struct{}, wg *sync.WaitGroup) {
 	defer ln.Close()
 	for {
 		conn, err := ln.AcceptSocks()
