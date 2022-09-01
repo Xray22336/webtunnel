@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 
 	"sync"
 	"syscall"
@@ -118,7 +119,7 @@ func socksAcceptLoop(ln *pt.SocksListener, shutdown chan struct{}, wg *sync.Wait
 						conn.Reject()
 						return
 					}
-					config.Path = url.RawPath
+					config.Path = strings.TrimPrefix(url.EscapedPath(), "/")
 					config.TLSServerName = url.Hostname()
 					port := url.Port()
 					if port == "" {
