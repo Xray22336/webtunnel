@@ -2,91 +2,180 @@
 
 Pluggable Transport based on HTTP Upgrade(HTTPT)
 
-## Getting started
+WebTunnel is pluggable transport that attempt to imitate web browsing activities based on [HTTPT](https://censorbib.nymity.ch/#Frolov2020b).
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Client Usage
+Connect to a WebTunnel server with a Tor configuration file like:
+```
+UseBridges 1
+DataDirectory datadir
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+ClientTransportPlugin webtunnel exec ./client
 
-## Add your files
+Bridge webtunnel 192.0.2.3:1 url=https://akbwadp9lc5fyyz0cj4d76z643pxgbfh6oyc-167-71-71-157.sslip.io/5m9yq0j4ghkz0fz7qmuw58cvbjon0ebnrsp0
 
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
+SocksPort auto
+
+Log info
+```
+## Server Setup
+
+#### Install Tor
+On a Debian system, first install tor normally with
+```
+apt install apt-transport-https
+lsb_release -c
+nano /etc/apt/sources.list.d/tor.list
+wget -qO- https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc | gpg --dearmor | tee /usr/share/keyrings/tor-archive-keyring.gpg >/dev/null
+apt update
+apt install tor deb.torproject.org-keyring
+```
+
+### Disable default instance
+The default Tor configuration is not useful for this setup, so the next step will be disabling them.
+```
+systemctl stop tor@default.service
+systemctl mask tor@default.service
+```
+
+### Get Environment Ready
+```
+#copy server file to server
+scp server root@$SERVER_ADDRESS:/var/lib/torwebtunnel/webtunnel
+```
+
+then create server torrc at `/var/lib/torwebtunnel/torrc`
+```
+BridgeRelay 1
+
+ORPort 10000
+
+ServerTransportPlugin webtunnel exec /var/lib/torwebtunnel/webtunnel
+
+ServerTransportListenAddr webtunnel 127.0.0.1:11000
+
+ExtORPort auto
+
+ContactInfo WebTunnel email: tor.relay.email@torproject.net ciissversion:2
+
+Nickname WebTunnelTest
+
+PublishServerDescriptor 1
+BridgeDistribution none
+
+DataDirectory /var/lib/torwebtunnel/tor-data
+CacheDirectory /tmp/tor-tmp-torwebtunnel
+
+SocksPort 0
+```
+
+#### Configure service unit file
+Create a service unit file as follow
+```
+[Unit]
+Description=Tor Web Tunnel
+
+[Service]
+Type=simple
+DynamicUser=yes
+PrivateUsers=true
+PrivateMounts=true
+ProtectSystem=strict
+PrivateTmp=true
+PrivateDevices=true
+ProtectClock=true
+NoNewPrivileges=true
+ProtectHome=tmpfs
+ProtectKernelModules=true
+ProtectKernelLogs=true
+
+StateDirectory=torwebtunnel
+
+ExecStart=/usr/bin/tor -f /var/lib/torwebtunnel/torrc --RunAsDaemon 0
+
+[Install]
+WantedBy=default.target
+```
+
+#### Obtain Certificate
+WebTunnel Requires a valid TLS certificate, to obtain that
+```
+curl https://get.acme.sh | sh -s email=my@example.com
+~/.acme.sh/acme.sh --issue --standalone --domain $SERVER_ADDRESS
+```
+
+#### Install & Configure Nginx
+To coexist with other content at a single port, it is necessary to install a reverse proxy like nginx:
+```
+apt install nginx
+```
+
+And then configure HTTP Upgrade forwarding at /etc/nginx/nginx.conf.
+```
+--- a/before.conf
++++ b/after.conf
+@@ -60,6 +60,13 @@ http {
+ 
+        include /etc/nginx/conf.d/*.conf;
+        include /etc/nginx/sites-enabled/*;
++
++       #WebSocket Support
++       map $http_upgrade $connection_upgrade {
++                       default upgrade;
++                       ''      close;
++       }
++
+ }
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel.git
-git branch -M main
-git push -uf origin main
+
+Finally, add http forwarding setting to a new file at /etc/nginx/site-enabled .
 ```
+server {
+    listen [::]:443 ssl http2;
+    listen 443 ssl http2;
+    server_name $SERVER_ADDRESS;
+    #ssl on;
 
-## Integrate with your tools
+    # certs sent to the client in SERVER HELLO are concatenated in ssl_certificate
+    ssl_certificate /etc/nginx/ssl/fullchain.cer;
+    ssl_certificate_key /etc/nginx/ssl/key.key;
 
-- [ ] [Set up project integrations](https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel/-/settings/integrations)
 
-## Collaborate with your team
+    ssl_session_timeout 15m;
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
+    ssl_protocols TLSv1.2 TLSv1.3;
 
-## Test and Deploy
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
 
-Use the built-in continuous integration in GitLab.
+    ssl_prefer_server_ciphers off;
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+    ssl_session_cache shared:MozSSL:50m;
+    #ssl_ecdh_curve secp521r1,prime256v1,secp384r1;
+    ssl_session_tickets off;
 
-***
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    
+    location /$PATH {
+        proxy_pass http://127.0.0.1:11000;
+        proxy_http_version 1.1;
 
-# Editing this README
+        ###Set WebSocket headers ####
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
+        ### Set Proxy headers ####
+        proxy_set_header        Accept-Encoding   "";
+        proxy_set_header        Host            $host;
+        proxy_set_header        X-Real-IP       $remote_addr;
+        proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto $scheme;
+        add_header              Front-End-Https   on;
 
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+        proxy_redirect     off;
+}
 
-## Name
-Choose a self-explaining name for your project.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+}
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
-
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
-
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
-
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
-
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
-
-## License
-For open source projects, say how it is licensed.
-
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+```
