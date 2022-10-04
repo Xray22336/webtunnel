@@ -25,7 +25,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("error in setup: %s", err)
 	}
-
 	listeners := make([]net.Listener, 0)
 	for _, bindaddr := range ptInfo.Bindaddrs {
 		if bindaddr.MethodName != ptMethodName {
@@ -33,7 +32,7 @@ func main() {
 			continue
 		}
 
-		args := pt.Args{}
+		args := bindaddr.Options
 		config := &ServerConfig{}
 		ln, err := net.ListenTCP("tcp", bindaddr.Addr)
 		if err != nil {
