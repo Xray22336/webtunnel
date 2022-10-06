@@ -12,6 +12,8 @@ import (
 	"sync"
 	"syscall"
 
+	"gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel"
+
 	pt "git.torproject.org/pluggable-transports/goptlib.git"
 )
 
@@ -40,6 +42,9 @@ func main() {
 		}
 		defer ln.Close()
 		go acceptLoop(ln, config, &ptInfo)
+
+		args.Add("publicVersion", webtunnel.Version)
+
 		pt.SmethodArgs(bindaddr.MethodName, bindaddr.Addr, args)
 		listeners = append(listeners, ln)
 	}
