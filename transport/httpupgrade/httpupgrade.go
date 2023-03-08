@@ -60,7 +60,7 @@ func (t Transport) Server(conn net.Conn) (net.Conn, error) {
 	connection := strings.ToLower(req.Header.Get("Connection"))
 	upgrade := strings.ToLower(req.Header.Get("Upgrade"))
 	if connection != "upgrade" || upgrade != "websocket" {
-		return nil, err
+		return nil, errors.New("unrecognized request")
 	}
 	resp := &http.Response{
 		Status:     "101 Switching Protocols",
