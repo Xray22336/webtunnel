@@ -93,6 +93,7 @@ func acceptLoop(ln net.Listener, config *ServerConfig, ptInfo *pt.ServerInfo) {
 			conn, err := transport.Accept(conn)
 			if err != nil {
 				log.Printf("handleConn: %v", err)
+				return
 			}
 			handleConn(conn, ptInfo)
 		}()
