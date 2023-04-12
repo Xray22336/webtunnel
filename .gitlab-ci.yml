@@ -1,6 +1,7 @@
 stages:
   - test
   - build
+  - container
 
 unit_test:
   image: golang:1.18-bullseye
@@ -40,3 +41,22 @@ build_arm64_linux:
   artifacts:
     paths:
       - build/arm64-linux/
+
+
+build-server-container:
+  stage: container
+  image:
+    name: gcr.io/kaniko-project/executor:v1.9.1-debug
+    entrypoint: [""]
+  script:
+    - mkdir ${CI_PROJECT_DIR}/container_image
+    - /kaniko/executor
+      --context "${CI_PROJECT_DIR}"
+      --dockerfile "${CI_PROJECT_DIR}/Dockerfile"
+      --destination "webtunnel-server"
+      --tar-path="${CI_PROJECT_DIR}/container_image/webtunnel-server.tar"
+      --no-push
+      --reproducible
+  artifacts:
+    paths:
+      - container_image/webtunnel-server.tar
