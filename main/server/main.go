@@ -14,7 +14,7 @@ import (
 
 	"gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel"
 
-	pt "git.torproject.org/pluggable-transports/goptlib.git"
+	pt "gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/goptlib"
 )
 
 const ptMethodName = "webtunnel"

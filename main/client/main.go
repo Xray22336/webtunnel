@@ -13,7 +13,7 @@ import (
 	"sync"
 	"syscall"
 
-	pt "git.torproject.org/pluggable-transports/goptlib.git"
+	pt "gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/goptlib"
 )
 
 func main() {
