@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel/common/syntheticIP"
 	"io"
 	"io/ioutil"
 	"log"
@@ -43,9 +44,26 @@ func main() {
 		defer ln.Close()
 		go acceptLoop(ln, config, &ptInfo)
 
-		args.Add("publicVersion", webtunnel.Version)
+		args.Add("ver", webtunnel.Version)
 
-		pt.SmethodArgs(bindaddr.MethodName, bindaddr.Addr, args)
+		urlValue, ok := args.Get("url")
+		if !ok {
+			pt.SmethodError(bindaddr.MethodName, "missing url parameter")
+			continue
+		}
+
+		_, cidr, err := net.ParseCIDR("2001:DB8::/32")
+		if err != nil {
+			pt.SmethodError(bindaddr.MethodName, fmt.Sprintf("error in ParseCIDR: %s", err))
+		}
+
+		generatedAddress, err := syntheticIP.GenerateSyntheticIPAddress("WEBTUNNEL+"+urlValue, *cidr)
+		if err != nil {
+			pt.SmethodError(bindaddr.MethodName, fmt.Sprintf("error in GenerateSyntheticIPAddress: %s", err))
+		}
+
+		generatedAddr := &net.TCPAddr{IP: generatedAddress, Port: 443}
+		pt.SmethodArgs(bindaddr.MethodName, generatedAddr, args)
 		listeners = append(listeners, ln)
 	}
 	pt.SmethodsDone()
