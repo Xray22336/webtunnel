@@ -41,4 +41,7 @@ RUN chown debian-tor:debian-tor /var/log/tor
 ADD release/container/start-tor.sh /usr/local/bin
 RUN chmod 0755 /usr/local/bin/start-tor.sh
 
+ADD release/container/get-bridge-line.sh /usr/local/bin
+RUN chmod 0755 /usr/local/bin/get-bridge-line.sh
+
 ENTRYPOINT ["/usr/local/bin/start-tor.sh"]
