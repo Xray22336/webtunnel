@@ -179,3 +179,85 @@ server {
 }
 
 ```
+
+## Docker Setup
+
+Webtunnel is a new pluggable transport available for bridge operators.
+
+### Prerequisites
+An existing website using nginx balancer to handle traffic. (other load banlancer is currently untested)
+
+Handle traffic directly, without CDN. (CDN passthrough is currently untested)
+
+A container runtime like Docker.
+
+### Configure nginx Forwarding
+If you haven't already, configure websocket forwarding support in nginx by configure HTTP Upgrade forwarding at /etc/nginx/nginx.conf:
+```
+--- a/before.conf
++++ b/after.conf
+@@ -60,6 +60,13 @@ http {
+ 
+        include /etc/nginx/conf.d/*.conf;
+        include /etc/nginx/sites-enabled/*;
++
++       #WebSocket Support
++       map $http_upgrade $connection_upgrade {
++                       default upgrade;
++                       ''      close;
++       }
++
+ }
+```
+And add a forwarded path under one the served domain, typically defined in files within `/etc/nginx/sites-enabled/`, replace $PATH with a random string(which you could generate with `echo $(cat /dev/urandom | tr -cd "qwertyuiopasdfghjklzxcvbnmMNBVCXZLKJHGFDSAQWERTUIOP0987654321"|head -c 24)`):
+```
+location /$PATH {
+        proxy_pass http://127.0.0.1:11000;
+        proxy_http_version 1.1;
+
+        ###Set WebSocket headers ####
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        ### Set Proxy headers ####
+        proxy_set_header        Accept-Encoding   "";
+        proxy_set_header        Host            $host;
+        proxy_set_header        X-Real-IP       $remote_addr;
+        proxy_set_header        X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header        X-Forwarded-Proto $scheme;
+        add_header              Front-End-Https   on;
+
+        proxy_redirect     off;
+}
+``` 
+
+### Install Docker Runtime(if necessary)
+```
+apt install curl sudo
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh ./get-docker.sh
+```
+
+### Run Dockerlized Webtunnel Server
+Replace `URL` with your domain and path, and `OPERATOR_EMAIL` with your email address, then run:
+```
+truncate --size 0 .env
+echo "URL=https://yourdomain/and/path" >> .env
+echo "OPERATOR_EMAIL=your@email.org" >> .env
+echo "BRIDGE_NICKNAME=WTBr$(cat /dev/urandom | tr -cd 'qwertyuiopasdfghjklzxcvbnmMNBVCXZLKJHGFDSAQWERTUIOP0987654321'|head -c 10)" >> .env
+echo "GENEDORPORT=4$(cat /dev/urandom | tr -cd '0987654321'|head -c 4)" >> .env
+```
+This will create an environment file for the configuration of webtunnel bridge.
+
+After creating the configure file, download the webtunnel docker compose file, and instancize it.
+````shell
+curl https://gitlab.torproject.org/tpo/anti-censorship/pluggable-transports/webtunnel/-/raw/main/release/container/docker-compose.yml?inline=false > docker-compose.yml
+docker compose up -d
+````
+It includes auto update by default, and will update webtunnel bridge server without any further action. Remove `watchtower` to disable this behavior.
+
+### Get Bridgeline and Check it is Running
+You can obtain bridgeline and verify if it is working by running
+```shell
+docker compose exec webtunnel-bridge get-bridge-line.sh
+```
