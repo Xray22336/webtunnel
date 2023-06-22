@@ -130,6 +130,9 @@ And then configure HTTP Upgrade forwarding at /etc/nginx/nginx.conf.
 ```
 
 Finally, add http forwarding setting to a new file at /etc/nginx/site-enabled .
+
+Tip: You should serve full chain certificate instead of leaf certificate, and verify your tls setup with curl. 
+
 ```
 server {
     listen [::]:443 ssl http2;
@@ -212,7 +215,7 @@ If you haven't already, configure websocket forwarding support in nginx by confi
 And add a forwarded path under one the served domain, typically defined in files within `/etc/nginx/sites-enabled/`, replace $PATH with a random string(which you could generate with `echo $(cat /dev/urandom | tr -cd "qwertyuiopasdfghjklzxcvbnmMNBVCXZLKJHGFDSAQWERTUIOP0987654321"|head -c 24)`):
 ```
 location /$PATH {
-        proxy_pass http://127.0.0.1:11000;
+        proxy_pass http://127.0.0.1:15000;
         proxy_http_version 1.1;
 
         ###Set WebSocket headers ####
