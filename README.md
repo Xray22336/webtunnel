@@ -21,13 +21,20 @@ Log info
 ## Server Setup
 
 #### Install Tor
-On a Debian system, first install tor normally with
+On a Debian system, first install tor from the [Tor Debian repository](https://support.torproject.org/apt/tor-deb-repo/) with
 ```
 apt install apt-transport-https
-lsb_release -c
-nano /etc/apt/sources.list.d/tor.list
+
+lsb_release -cs
+cat <<EOF > /etc/apt/sources.list.d/tor.list
+   deb     [signed-by=/usr/share/keyrings/tor-archive-keyring.gpg] https://deb.torproject.org/torproject.org bullseye main
+   deb-src [signed-by=/usr/share/keyrings/tor-archive-keyring.gpg] https://deb.torproject.org/torproject.org bullseye main
+EOF
+
 wget -qO- https://deb.torproject.org/torproject.org/A3C4F0F979CAA22CDBA8F512EE8CBC9E886DDD89.asc | gpg --dearmor | tee /usr/share/keyrings/tor-archive-keyring.gpg >/dev/null
+
 apt update
+
 apt install tor deb.torproject.org-keyring
 ```
 
