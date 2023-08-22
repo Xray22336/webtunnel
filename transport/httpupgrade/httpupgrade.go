@@ -76,5 +76,27 @@ func (t Transport) Server(conn net.Conn) (net.Conn, error) {
 	if err != nil {
 		return nil, err
 	}
-	return conn, nil
+
+	var remoteAddr net.Addr
+	forwardedForHeader := req.Header.Get("X-Forwarded-For")
+	if forwardedForHeader != "" {
+		forwardedForHeader = strings.Split(forwardedForHeader, ",")[0]
+		remoteAddr = &net.TCPAddr{
+			IP:   net.ParseIP(forwardedForHeader),
+			Port: 60000,
+		}
+	}
+	return &connWithAlternativeRemoteAddr{conn, remoteAddr}, nil
+}
+
+type connWithAlternativeRemoteAddr struct {
+	net.Conn
+	remoteAddr net.Addr
+}
+
+func (c connWithAlternativeRemoteAddr) RemoteAddr() net.Addr {
+	if c.remoteAddr != nil {
+		return c.remoteAddr
+	}
+	return c.Conn.RemoteAddr()
 }
