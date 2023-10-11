@@ -44,6 +44,10 @@ func main() {
 		defer ln.Close()
 		go acceptLoop(ln, config, &ptInfo)
 
+		if args == nil {
+			args = pt.Args{}
+		}
+
 		args.Add("ver", webtunnel.Version)
 
 		urlValue, ok := args.Get("url")
@@ -55,17 +59,25 @@ func main() {
 		_, cidr, err := net.ParseCIDR("2001:DB8::/32")
 		if err != nil {
 			pt.SmethodError(bindaddr.MethodName, fmt.Sprintf("error in ParseCIDR: %s", err))
+			continue
 		}
 
 		generatedAddress, err := syntheticIP.GenerateSyntheticIPAddress("WEBTUNNEL+"+urlValue, *cidr)
 		if err != nil {
 			pt.SmethodError(bindaddr.MethodName, fmt.Sprintf("error in GenerateSyntheticIPAddress: %s", err))
+			continue
 		}
 
 		generatedAddr := &net.TCPAddr{IP: generatedAddress, Port: 443}
 		pt.SmethodArgs(bindaddr.MethodName, generatedAddr, args)
 		listeners = append(listeners, ln)
 	}
+
+	if len(listeners) == 0 {
+		pt.SmethodError(ptMethodName, "no valid listener configured")
+		return
+	}
+
 	pt.SmethodsDone()
 
 	sigChan := make(chan os.Signal, 1)
